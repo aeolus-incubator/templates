@@ -1,0 +1,223 @@
+<?xml version="1.0"?>
+<template>
+  <name>BrowserQuest</name>
+  <description>BrowserQuest Server - latest git</description>
+  <os>
+    <name>Fedora</name>
+    <version>16</version>
+    <arch>x86_64</arch>
+    <install type="url">
+
+      <!-- This is the Fedora 16 base repository -->
+      <url>http://download.fedoraproject.org/pub/fedora/linux/releases/16/Everything/x86_64/os/</url>
+
+      <!-- Note that only a base package installation is done. -->
+      <!-- No yum updates are automatically applied.  If you   -->
+      <!-- want updates (and you do! :>), you'll need to have  -->
+      <!-- a "yum update -y" in the command list below.        -->
+
+    </install>
+
+    <!-- The password for the root user.  You can use this to  -->
+    <!-- log in remotely if desired.                           -->
+    <rootpw>p@ssw0rd</rootpw>
+
+  </os>
+
+
+  <!-- All of the repositories below are added to /etc/yum.repos.d/ -->
+  <!-- *after* the initial OS installation is done.                 -->
+
+  <repositories>
+
+    <!-- Node.js Fedora 16 repository -->
+    <repository name="node-js">
+      <url>http://justinclift.fedorapeople.org/nodejs/Fedora-16/x86_64/</url>
+      <signed>false</signed>
+    </repository>
+
+  </repositories>
+
+
+  <!-- After the main OS has been installed, the packages below are installed --> 
+  <!-- in a separate step.  It takes into account the repositories in         -->
+  <!-- /etc/yum.repos.d/, unlike the base OS installation which doesn't.      -->
+
+  <packages>
+
+    <!-- Development tools -->
+    <package name="make"/>
+    <package name="gcc-c++"/>
+    <package name="zlib-devel"/>
+    <package name="git"/>
+
+    <!-- Node.js -->
+    <package name="nodejs"/>
+    <package name="nodejs-devel"/>
+    <package name="nodejs-waf"/>
+
+    <!-- NginX -->
+    <package name="nginx"/>
+
+    <!-- Facter -->
+    <package name="facter"/>
+
+  </packages>
+
+  <files>
+    <file name="/etc/init.d/browserquest"><![CDATA[#!/bin/bash
+## BEGIN INIT INFO
+# Provides: browserquest
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 2 3 4 6
+# Required-Start: network
+#              
+## END INIT INFO
+# browserquest:       Start BrowserQuest server
+#
+# chkconfig: 2345 80 99
+#
+# description: Starts the BrowserQuest server
+#
+
+# Source function library.
+. /etc/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ "$NETWORKING" = "no" ] && exit 0
+
+NODE="/usr/bin/node"
+prog=$(basename $NODE)
+
+lockfile="/var/lock/subsys/node"
+pidfile="/var/run/browserquest.pid"
+
+base=${0##*/}
+
+start() {
+	echo -n "Starting BrowserQuest"
+
+	# Figure out which virtualisation platform we're running on
+	if [ -f /etc/sysconfig/cloud-info ]
+	then
+		source /etc/sysconfig/cloud-info
+	fi
+
+	# Retrieve an IP address people can connect to
+	if [ "$CLOUD_TYPE" = "ec2" ]
+	then
+		# We're running in EC2, so get the public address
+		HOSTADDRESS=`/usr/bin/facter ec2_public_hostname`
+	else
+		# We're not running in EC2, so just grab any ip address
+		HOSTADDRESS=`/usr/bin/facter ipaddress`
+	fi
+
+	# Update BrowserQuest client address with it
+	sed -e "s/Set production websocket host here/$HOSTADDRESS/" /usr/share/nginx/BrowserQuest/client/config/config_build.json-dist > /usr/share/nginx/BrowserQuest/client/config/config_build.json
+	sed -e "s/Set local dev websocket host here/$HOSTADDRESS/" /usr/share/nginx/BrowserQuest/client/config/config_local.json-dist > /usr/share/nginx/BrowserQuest/client/config/config_local.json
+
+        # Start Node.js
+        cd /usr/share/nginx/BrowserQuest
+	$NODE server/js/main.js > /var/log/nodejs.log 2> /var/log/nodejs.error &
+	retval=$?
+        echo $! > $pidfile
+	echo
+	[ $retval -eq 0 ] && touch $lockfile
+	return $retval
+}
+
+stop() {
+	echo -n "Stopping BrowserQuest"
+	killproc -p $pidfile $prog
+	retval=$?
+	echo
+	[ $retval -eq 0 ] && rm -f $lockfile
+	return $retval
+}
+
+restart() {
+	configtest_q || return 6
+	stop
+	start
+}
+
+rh_status() {
+	status $prog
+}
+
+rh_status_q() {
+	rh_status >/dev/null 2>&1
+}
+
+case "$1" in
+	start)
+		rh_status_q && exit 0
+		$1
+		;;
+	stop)
+		rh_status_q || exit 0
+		$1
+		;;
+	restart)
+		$1
+		;;
+	status|status_q)
+		rh_$1
+		;;
+	condrestart|try-restart)
+		rh_status_q || exit 7
+		restart
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|status|restart}"
+		exit 2
+esac
+]]>
+    </file>
+  </files>
+
+  <!-- After the above packages have been installed, -->
+  <!-- the commands below are run, in order.         -->
+
+  <commands>
+
+    <!-- This pulls in updated Fedora packages.  Practically mandatory  -->
+    <!-- in any real world deployment. :>                               -->
+    <command name="yum-update">yum update -y</command>
+
+    <!-- Run the script that does everything -->
+    <command name="do-setup"><![CDATA[#!/bin/bash
+
+# Clone the BrowserQuest git repo
+git clone git://github.com/browserquest/BrowserQuest.git
+mv BrowserQuest /usr/share/nginx
+
+# Add the Node.js modules required for BrowserQuest
+cd /usr/share/nginx/BrowserQuest; npm install -d bison log memcache sanitizer underscore websocket websocket-server
+
+# Set BrowserQuest client dir as Nginx document root
+sed -i -e "s#/usr/share/nginx/html#/usr/share/nginx/BrowserQuest/client#" /etc/nginx/conf.d/default.conf
+
+# Enable directory listing for Nginx.  Useful for debugging some BrowserQuest problems
+sed -i -e "s/#charset koi8-r/autoindex on/" /etc/nginx/conf.d/default.conf
+
+# Enable Nginx at boot
+chkconfig nginx on
+
+# Copy BrowserQuest shared dir to client
+cp -rp /usr/share/nginx/BrowserQuest/shared /usr/share/nginx/BrowserQuest/client/
+
+# Set up BrowerQuest startup script
+chmod 755 /etc/init.d/browserquest
+chkconfig --add browserquest
+chkconfig browserquest on
+
+]]>
+
+</command>
+  </commands>
+</template>
