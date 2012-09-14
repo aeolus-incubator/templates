@@ -1,4 +1,4 @@
-aeolus-templates
+Aeolus-templates
 ================
 
-Templates for Aeolus
+Useful templates for Aeolus, broken into categories
