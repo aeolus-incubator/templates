@@ -21,11 +21,15 @@ How to use
 ----------
 
 Build and launch the instance, then connect to it
-using Firefox on port 80 using Http.
+on port 80 using http.
 
-Notes
------
+Browser support
+---------------
 
-Really use Firefox to connect to it.  Chromium
-doesn't support some needed features, and looks
-terrible.  Other browsers are untested.
+* Firefox - Works well
+* Safari - Works well
+* Chrome - Sounds effects don't work
+* Chromium - Plays in "mobile" mode only, very small screen
+* Opera - Doesn't work, no WebSocket support
+* IE (any version) - Untested
+
