@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <template>
   <name>BrowserQuest</name>
-  <description>BrowserQuest Server - latest git</description>
+  <description>BrowserQuest v1.2 Server</description>
   <os>
     <name>Fedora</name>
     <version>16</version>
