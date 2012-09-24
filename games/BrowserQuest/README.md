@@ -26,10 +26,9 @@ Build and launch the instance, then connect to it on port 80 using http.
 Browser support
 ---------------
 
-* Firefox - Works well
-* Safari - Works well
-* Chrome - Sounds effects don't work
-* Chromium - Plays in "mobile" mode only, very small screen
-* Opera - Doesn't work, no WebSocket support
-* IE (any version) - Untested
-
+* Firefox (any recent) - Works well.
+* Safari 6.x - Works well.
+* Chrome - Sounds effects don't work.
+* Chromium - Varies wildly. Some releases display using BrowserQuest's "mobile" layout, with very small screen. Not recommended.
+* Opera - Doesn't work, no WebSocket support.
+* IE (any version) - Untested.
