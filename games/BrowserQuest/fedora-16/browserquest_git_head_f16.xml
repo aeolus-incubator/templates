@@ -49,20 +49,17 @@
     <package name="make"/>
     <package name="gcc-c++"/>
     <package name="zlib-devel"/>
-    <package name="git"/>
 
     <!-- Node.js -->
     <package name="nodejs"/>
     <package name="nodejs-devel"/>
     <package name="nodejs-waf"/>
 
-    <!-- NginX -->
-    <package name="nginx"/>
-
-    <!-- Facter -->
-    <package name="facter"/>
-
   </packages>
+
+
+  <!-- After the packages above have been installed, -->
+  <!-- the commands below are run, in order.         -->
 
   <files>
     <file name="/etc/init.d/browserquest"><![CDATA[#!/bin/bash
@@ -98,30 +95,10 @@ pidfile="/var/run/browserquest.pid"
 base=${0##*/}
 
 start() {
-	echo -n "Starting BrowserQuest"
-
-	# Figure out which virtualisation platform we're running on
-	if [ -f /etc/sysconfig/cloud-info ]
-	then
-		source /etc/sysconfig/cloud-info
-	fi
-
-	# Retrieve an IP address people can connect to
-	if [ "$CLOUD_TYPE" = "ec2" ]
-	then
-		# We're running in EC2, so get the public address
-		HOSTADDRESS=`/usr/bin/facter ec2_public_hostname`
-	else
-		# We're not running in EC2, so just grab any ip address
-		HOSTADDRESS=`/usr/bin/facter ipaddress`
-	fi
-
-	# Update BrowserQuest client address with it
-	sed -e "s/Set production websocket host here/$HOSTADDRESS/" /usr/share/nginx/BrowserQuest/client/config/config_build.json-dist > /usr/share/nginx/BrowserQuest/client/config/config_build.json
-	sed -e "s/Set local dev websocket host here/$HOSTADDRESS/" /usr/share/nginx/BrowserQuest/client/config/config_local.json-dist > /usr/share/nginx/BrowserQuest/client/config/config_local.json
+  echo -n "Starting BrowserQuest"
 
         # Start Node.js
-        cd /usr/share/nginx/BrowserQuest
+        cd /root/browserquest-BrowserQuest-629882b
 	$NODE server/js/main.js > /var/log/nodejs.log 2> /var/log/nodejs.error &
 	retval=$?
         echo $! > $pidfile
@@ -180,8 +157,9 @@ esac
     </file>
   </files>
 
-  <!-- After the above packages have been installed, -->
-  <!-- the commands below are run, in order.         -->
+
+  <!-- After any files above have been installed, -->
+  <!-- the commands below are run, in order.      -->
 
   <commands>
 
@@ -190,26 +168,14 @@ esac
     <command name="yum-update">yum update -y</command>
 
     <!-- Run the script that does everything -->
-    <command name="do-setup"><![CDATA[#!/bin/bash
+    <command name="setup-browserquest"><![CDATA[#!/bin/bash
 
-# Clone the BrowserQuest git repo
-git clone git://github.com/browserquest/BrowserQuest.git
-mv BrowserQuest /usr/share/nginx
+# Download and extract the BrowserQuest v1.2 tarball
+curl -sL https://github.com/browserquest/BrowserQuest/tarball/v1.2 | tar xzp
 
 # Add the Node.js modules required for BrowserQuest
-cd /usr/share/nginx/BrowserQuest; npm install -d bison log memcache sanitizer underscore websocket websocket-server
-
-# Set BrowserQuest client dir as Nginx document root
-sed -i -e "s#/usr/share/nginx/html#/usr/share/nginx/BrowserQuest/client#" /etc/nginx/conf.d/default.conf
-
-# Enable directory listing for Nginx.  Useful for debugging some BrowserQuest problems
-sed -i -e "s/#charset koi8-r/autoindex on/" /etc/nginx/conf.d/default.conf
-
-# Enable Nginx at boot
-chkconfig nginx on
-
-# Copy BrowserQuest shared dir to client
-cp -rp /usr/share/nginx/BrowserQuest/shared /usr/share/nginx/BrowserQuest/client/
+cd browserquest-BrowserQuest-629882b
+npm install -d
 
 # Set up BrowerQuest startup script
 chmod 755 /etc/init.d/browserquest
