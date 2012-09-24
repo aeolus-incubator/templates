@@ -1,9 +1,8 @@
 BrowserQuest
 ============
 
-This Aeolus template starts a BrowserQuest server,
-pulling down the latest BrowserQuest git master head
-when it's built.
+This Aeolus template starts a BrowserQuest v1.2 server.
+
 
 Known to work on
 ----------------
@@ -11,17 +10,18 @@ Known to work on
 * EC2 (64-bit instances, including m1.small)
 * VMware vSphere (64-bit instances)
 
+
 Requirements
 ------------
 
-Tcp ports 80 and 8000 must be open for incoming
-traffic.
+Tcp port 80 must be open for incoming traffic.
+
 
 How to use
 ----------
 
-Build and launch the instance, then connect to it
-on port 80 using http.
+Build and launch the instance, then connect to it on port 80 using http.
+
 
 Browser support
 ---------------
