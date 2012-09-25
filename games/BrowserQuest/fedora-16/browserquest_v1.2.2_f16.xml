@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <template>
   <name>BrowserQuest</name>
-  <description>BrowserQuest v1.2.1 Server</description>
+  <description>BrowserQuest v1.2.2 Server</description>
   <os>
     <name>Fedora</name>
     <version>16</version>
@@ -98,7 +98,7 @@ start() {
   echo -n "Starting BrowserQuest"
 
         # Start Node.js
-        cd /root/browserquest-BrowserQuest-df54fbb
+        cd /root/browserquest-BrowserQuest-95d47de
         $NODE server/js/main.js > /var/log/nodejs.log 2> /var/log/nodejs.error &
         retval=$?
         echo $! > $pidfile
@@ -170,15 +170,15 @@ esac
     <!-- Run the script that does everything -->
     <command name="setup-browserquest"><![CDATA[#!/bin/bash
 
-# Download and extract the BrowserQuest v1.2.1 tarball
-curl -sL https://github.com/browserquest/BrowserQuest/tarball/v1.2.1 | tar xpz
+# Download and extract the BrowserQuest v1.2.2 tarball
+curl -sL https://github.com/browserquest/BrowserQuest/tarball/v1.2.2 | tar xpz
 
 # Add the Node.js modules required for BrowserQuest
-cd browserquest-BrowserQuest-df54fbb
+cd browserquest-BrowserQuest-95d47de
 npm install -d
 
 # Change the server to listen on port 80
-sed -i -e "s/8000/80/" /root/browserquest-BrowserQuest-df54fbb/server/config.json
+sed -i -e "s/8000/80/" /root/browserquest-BrowserQuest-95d47de/server/config.json
 
 # Set up BrowerQuest startup script
 chmod 755 /etc/init.d/browserquest
