@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <template>
   <name>BrowserQuest</name>
-  <description>BrowserQuest v1.2 Server</description>
+  <description>BrowserQuest v1.2.1 Server</description>
   <os>
     <name>Fedora</name>
     <version>16</version>
@@ -39,7 +39,7 @@
   </repositories>
 
 
-  <!-- After the main OS has been installed, the packages below are installed --> 
+  <!-- After the main OS has been installed, the packages below are installed -->
   <!-- in a separate step.  It takes into account the repositories in         -->
   <!-- /etc/yum.repos.d/, unlike the base OS installation which doesn't.      -->
 
@@ -68,7 +68,7 @@
 # Default-Start: 2 3 4 5
 # Default-Stop: 0 1 2 3 4 6
 # Required-Start: network
-#              
+#
 ## END INIT INFO
 # browserquest:       Start BrowserQuest server
 #
@@ -98,60 +98,60 @@ start() {
   echo -n "Starting BrowserQuest"
 
         # Start Node.js
-        cd /root/browserquest-BrowserQuest-629882b
-	$NODE server/js/main.js > /var/log/nodejs.log 2> /var/log/nodejs.error &
-	retval=$?
+        cd /root/browserquest-BrowserQuest-df54fbb
+        $NODE server/js/main.js > /var/log/nodejs.log 2> /var/log/nodejs.error &
+        retval=$?
         echo $! > $pidfile
-	echo
-	[ $retval -eq 0 ] && touch $lockfile
-	return $retval
+        echo
+        [ $retval -eq 0 ] && touch $lockfile
+        return $retval
 }
 
 stop() {
-	echo -n "Stopping BrowserQuest"
-	killproc -p $pidfile $prog
-	retval=$?
-	echo
-	[ $retval -eq 0 ] && rm -f $lockfile
-	return $retval
+        echo -n "Stopping BrowserQuest"
+        killproc -p $pidfile $prog
+        retval=$?
+        echo
+        [ $retval -eq 0 ] && rm -f $lockfile
+        return $retval
 }
 
 restart() {
-	configtest_q || return 6
-	stop
-	start
+        configtest_q || return 6
+        stop
+        start
 }
 
 rh_status() {
-	status $prog
+        status $prog
 }
 
 rh_status_q() {
-	rh_status >/dev/null 2>&1
+        rh_status >/dev/null 2>&1
 }
 
 case "$1" in
-	start)
-		rh_status_q && exit 0
-		$1
-		;;
-	stop)
-		rh_status_q || exit 0
-		$1
-		;;
-	restart)
-		$1
-		;;
-	status|status_q)
-		rh_$1
-		;;
-	condrestart|try-restart)
-		rh_status_q || exit 7
-		restart
-		;;
-	*)
-		echo $"Usage: $0 {start|stop|status|restart}"
-		exit 2
+        start)
+            rh_status_q && exit 0
+            $1
+            ;;
+        stop)
+            rh_status_q || exit 0
+            $1
+            ;;
+        restart)
+            $1
+            ;;
+        status|status_q)
+            rh_$1
+            ;;
+        condrestart|try-restart)
+            rh_status_q || exit 7
+            restart
+            ;;
+        *)
+            echo $"Usage: $0 {start|stop|status|restart}"
+            exit 2
 esac
 ]]>
     </file>
@@ -170,12 +170,15 @@ esac
     <!-- Run the script that does everything -->
     <command name="setup-browserquest"><![CDATA[#!/bin/bash
 
-# Download and extract the BrowserQuest v1.2 tarball
-curl -sL https://github.com/browserquest/BrowserQuest/tarball/v1.2 | tar xzp
+# Download and extract the BrowserQuest v1.2.1 tarball
+curl -sL https://github.com/browserquest/BrowserQuest/tarball/v1.2.1 | tar xpz
 
 # Add the Node.js modules required for BrowserQuest
-cd browserquest-BrowserQuest-629882b
+cd browserquest-BrowserQuest-df54fbb
 npm install -d
+
+# Change the server to listen on port 80
+sed -i -e "s/8000/80/" /root/browserquest-BrowserQuest-df54fbb/server/config.json
 
 # Set up BrowerQuest startup script
 chmod 755 /etc/init.d/browserquest
