@@ -1,7 +1,7 @@
 BrowserQuest
 ============
 
-This Aeolus template starts a BrowserQuest v1.2 server.
+This Aeolus template starts a BrowserQuest v1.2.x server.
 
 
 Known to work on
