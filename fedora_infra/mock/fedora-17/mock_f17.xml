@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<template>
+  <name>Mock</name>
+  <description>Mock RPM Building Utility</description>
+  <os>
+    <name>Fedora</name>
+    <version>17</version>
+    <arch>x86_64</arch>
+    <install type="url">
+      <url>http://download.fedoraproject.org/pub/fedora/linux/releases/17/Fedora/x86_64/os/</url>
+    </install>
+
+    <rootpw>p@ssw0rd</rootpw>
+  </os>
+
+  <packages>
+    <!-- Development tools -->
+    <package name="mock"/>
+    <package name="fedpkg"/>
+    <package name="shadow-utils"/>
+  </packages>
+
+  <files>
+    <file name="/root/build-rails"><![CDATA[#!/bin/bash
+useradd -g mock mock
+git clone git://pkgs.fedoraproject.org/rubygem-rails
+cd rubygem-rails
+fedpkg srpm
+su mock -c "/usr/bin/mock -r fedora-17-x86_64 --init"
+su mock -c "/usr/bin/mock -r fedora-17-x86_64 --rebuild rubygem-rails*.src.rpm"
+]]>
+    </file>
+  </files>
+
+  <commands>
+    <command name="yum-update">yum update -y</command>
+    <command name="build-rails">sh /root/build-rails</command>
+  </commands>
+</template>

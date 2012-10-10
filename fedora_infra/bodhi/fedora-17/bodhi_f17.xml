@@ -1,0 +1,99 @@
+<!-- https://fedorahosted.org/bodhi/wiki/Deployment -->
+<template>
+  <name>Bodhi</name>
+  <description>Bodhi Updates Server</description>
+  <os>
+    <name>Fedora</name>
+    <version>17</version>
+    <arch>x86_64</arch>
+    <install type="url">
+      <url>http://download.fedoraproject.org/pub/fedora/linux/releases/17/Fedora/x86_64/os/</url>
+    </install>
+    <rootpw>p@ssw0rd</rootpw>
+  </os>
+
+  <packages>
+    <package name="postgresql-server"/>
+    <package name="bodhi-server"/>
+  </packages>
+
+  <files>
+    <file name="/etc/init.d/bodhi"><![CDATA[#!/bin/bash
+## BEGIN INIT INFO
+# Provides: bodhi
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 2 3 4 6
+# Required-Start: network
+#
+## END INIT INFO
+# bodhi:       Start Bodhi server
+#
+# chkconfig: 2345 80 99
+#
+# description: Starts the Bodhi server
+#
+
+# Source function library.
+. /etc/init.d/functions
+
+lockfile="/var/lock/subsys/node"
+pidfile="/var/run/bodhi.pid"
+
+start() {
+        start-bodhi&
+        retval=$?
+        echo $! > $pidfile
+        echo
+        [ $retval -eq 0 ] && touch $lockfile
+        return $retval
+}
+
+stop() {
+        killproc -p $pidfile $prog
+        retval=$?
+        echo
+        [ $retval -eq 0 ] && rm -f $lockfile
+        return $retval
+}
+
+restart() {
+        stop
+        start
+}
+
+case "$1" in
+        start)
+            $1
+            ;;
+        stop)
+            $1
+            ;;
+        restart)
+            $1
+            ;;
+        *)
+            echo $"Usage: $0 {start|stop|restart}"
+            exit 2
+esac
+]]>
+    </file>
+
+    <file name="/root/start-bodhi"><![CDATA[#!/bin/bash
+# setup bodhi
+bodhi-init
+#bodhi-pickledb load bodhi-pickledb*
+
+chmod 755 /etc/init.d/bodhi
+chkconfig --add bodhi
+service bodhi start
+# bodhi now running on port 8084
+]]>
+    </file>
+  </files>
+
+  <commands>
+    <command name="yum-update">yum update -y</command>
+    <command name="start-bodhi">sh /root/start-bodhi</command>
+  </commands>
+
+</template>

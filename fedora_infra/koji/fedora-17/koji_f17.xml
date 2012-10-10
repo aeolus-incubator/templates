@@ -1,0 +1,49 @@
+<!-- http://fedoraproject.org/wiki/Koji/ServerHowTo -->
+<template>
+  <name>Koji</name>
+  <description>Koji Build Server</description>
+  <os>
+    <name>Fedora</name>
+    <version>17</version>
+    <arch>x86_64</arch>
+    <install type="url">
+      <url>http://download.fedoraproject.org/pub/fedora/linux/releases/17/Fedora/x86_64/os/</url>
+    </install>
+    <rootpw>p@ssw0rd</rootpw>
+  </os>
+
+  <packages>
+    <package name="postgresql-server"/>
+    <package name="koji-hub" />
+    <package name="koji-web" />
+  </packages>
+
+  <files>
+    <file name="/root/start-koji"><![CDATA[#!/bin/bash
+# configure koji
+sed -i /etc/kojiweb/web.conf s/server.example.com/localhost
+sed -i /etc/kojiweb/web.conf s/hub.example.com/localhost
+echo "\nDBHost = localhost" >> /etc/koji-hub/hub.conf
+
+# setup and start postgres
+postgresql-setup initdb
+echo "\nhost koji koji 127.0.0.1/32 trust\nhost koji koji ::1/128 trust" >> /var/lib/pgsql/data/pg_hba.conf
+systemctl start postgresql.service
+systemctl enable postgresql.service
+su postgres -c "createuser -SDR koji"
+su postgres -c "createdb -O koji koji"
+psql koji koji < /usr/share/doc/koji*/docs/schema.sql
+
+# start httpd
+systemctl start httpd.service
+systemctl enable httpd.service
+]]>
+    </file>
+  </files>
+
+  <commands>
+    <command name="yum-update">yum update -y</command>
+    <command name="start-koji">sh /root/start-koji</command>
+  </commands>
+
+</template>
