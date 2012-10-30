@@ -1,49 +1,355 @@
 <!-- http://fedoraproject.org/wiki/Koji/ServerHowTo -->
 <template>
   <name>Koji</name>
-  <description>Koji Build Server</description>
-  <os>
-    <name>Fedora</name>
-    <version>17</version>
-    <arch>x86_64</arch>
-    <install type="url">
-      <url>http://download.fedoraproject.org/pub/fedora/linux/releases/17/Fedora/x86_64/os/</url>
-    </install>
-    <rootpw>p@ssw0rd</rootpw>
-  </os>
+  <description>Koji Build Server Hub</description>
+  <cloud>
+    <type></type>
+    <provider></provider>
+    <username></username>
+    <password></password>
+    <image></image>
+    <keyname></keyname>
+    <ssh_cmd></ssh_cmd>
+    <scp_cmd></scp_cmd>
+  </cloud>
+
+  <hostname>kojihub</hostname>
+
+  <firewall>
+    <tcp>22</tcp>
+    <tcp>80</tcp>
+    <tcp>443</tcp>
+  </firewall>
+
+  <users>
+    <user id="kojiadmin" password="" />
+    <user id="koji" password="" />
+  </users>
 
   <packages>
     <package name="postgresql-server"/>
     <package name="koji-hub" />
     <package name="koji-web" />
+    <package name="vim" />
+    <package name="wget" />
+    <package name="httpd" />
+    <package name="mod_ssl" />
+    <package name="postgresql-server" />
+    <package name="mod_python" />
+    <package name="mod_wsgi" />
   </packages>
 
+  <services>
+    <service name="sshd" />
+    <service name="httpd" />
+    <service name="postgresql">
+      <before>sudo -u postgres PGDATA=/var/lib/pgsql/data initdb</before>
+    </service>
+  </services>
+
+  <dirs>
+    <dir owner="apache" group="apache">/mnt/koji/packages</dir>
+    <dir owner="apache" group="apache">/mnt/koji/repos</dir>
+    <dir owner="apache" group="apache">/mnt/koji/work</dir>
+    <dir owner="apache" group="apache">/mnt/koji/scratch</dir>
+    <dir owner="apache" group="apache" remove="true">/etc/pki/koji</dir>
+  </dirs>
+
   <files>
-    <file name="/root/start-koji"><![CDATA[#!/bin/bash
-# configure koji
-sed -i /etc/kojiweb/web.conf s/server.example.com/localhost
-sed -i /etc/kojiweb/web.conf s/hub.example.com/localhost
-echo "\nDBHost = localhost" >> /etc/koji-hub/hub.conf
+    <file name="/etc/pki/koji/ssl.cnf"><![CDATA[
+HOME                    = .
+RANDFILE                = .rand
 
-# setup and start postgres
-postgresql-setup initdb
-echo "\nhost koji koji 127.0.0.1/32 trust\nhost koji koji ::1/128 trust" >> /var/lib/pgsql/data/pg_hba.conf
-systemctl start postgresql.service
-systemctl enable postgresql.service
-su postgres -c "createuser -SDR koji"
-su postgres -c "createdb -O koji koji"
-psql koji koji < /usr/share/doc/koji*/docs/schema.sql
+[ca] 
+default_ca              = ca_default
 
-# start httpd
-systemctl start httpd.service
-systemctl enable httpd.service
+[ca_default] 
+dir                     = .
+certs                   = $dir/certs
+crl_dir                 = $dir/crl
+database                = $dir/index.txt
+new_certs_dir           = $dir/newcerts
+certificate             = $dir/%s_ca_cert.pem
+private_key             = $dir/private/%s_ca_key.pem
+serial                  = $dir/serial
+crl                     = $dir/crl.pem
+x509_extensions         = usr_cert
+name_opt                = ca_default
+cert_opt                = ca_default
+default_days            = 3650
+default_crl_days        = 30
+default_md              = md5
+preserve                = no
+policy                  = policy_match
+
+[policy_match] 
+countryName             = match
+stateOrProvinceName     = match
+organizationName        = match
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional
+
+[req] 
+default_bits            = 1024
+default_keyfile         = privkey.pem
+distinguished_name      = req_distinguished_name
+attributes              = req_attributes
+x509_extensions         = v3_ca # The extentions to add to the self signed cert
+string_mask             = MASK:0x2002
+
+[req_distinguished_name] 
+countryName                     = Country Name (2 letter code)
+countryName_default             = US
+countryName_min                 = 2
+countryName_max                 = 2
+stateOrProvinceName             = State or Province Name (full name)
+stateOrProvinceName_default     = North Carolina
+localityName                    = Locality Name (eg, city)
+localityName_default            = Raleigh
+0.organizationName              = Organization Name (eg, company)
+0.organizationName_default      = aeolus
+organizationalUnitName          = Organizational Unit Name (eg, section)
+organizationalUnitName_default  = insert_hostname
+commonName                      = Common Name (eg, your name or your server\'s hostname)
+commonName_default              = insert_hostname
+commonName_max                  = 64
+emailAddress                    = Email Address
+emailAddress_max                = 64
+
+[req_attributes] 
+challengePassword               = A challenge password
+challengePassword_min           = 4
+challengePassword_max           = 20
+unstructuredName                = An optional company name
+
+[usr_cert] 
+basicConstraints                = CA:FALSE
+nsComment                       = "OpenSSL Generated Certificate"
+subjectKeyIdentifier            = hash
+authorityKeyIdentifier          = keyid,issuer:always
+
+[v3_ca] 
+subjectKeyIdentifier            = hash
+authorityKeyIdentifier          = keyid:always,issuer:always
+basicConstraints                = CA:true
+]]>
+    </file>
+
+    <file name="/etc/pki/koji/kca.sh" mode="744"><![CDATA[#!/bin/bash
+# generates a certificate authority cert for koji
+cd /etc/pki/koji/
+mkdir {certs,private,confs}
+touch index.txt
+echo 01 > serial
+openssl genrsa -out private/koji_ca_cert.key 2048
+openssl req -batch -config ssl.cnf -new -x509 -days 3650 \
+-key private/koji_ca_cert.key -out koji_ca_cert.crt -extensions v3_ca \
+-subj "/C=US/ST=North\ Carolina/L=Raleigh/O=aeolus/CN=`hostname`"
+]]>
+    </file>
+
+    <file name="/etc/pki/koji/kjc.sh" mode="744"><![CDATA[#!/bin/bash
+#!/bin/bash
+cd /etc/pki/koji/
+# generates a koji cert for the specified user
+caname=koji
+
+# user is equal to parameter one or the first argument when you actually run the script
+user=$1
+
+openssl genrsa -out certs/${user}.key 2048
+cat ssl.cnf | sed 's/insert_hostname/'${user}'/'> ssl2.cnf
+openssl req -batch -config ssl2.cnf -new -nodes -out certs/${user}.csr -key certs/${user}.key \
+-subj "/C=US/ST=North Carolina/L=Raleigh/O=aeolus/CN=${user}"
+openssl ca -batch -config ssl2.cnf -keyfile private/${caname}_ca_cert.key -cert ${caname}_ca_cert.crt \
+-out certs/${user}.crt -outdir certs -infiles certs/${user}.csr
+cat certs/${user}.crt certs/${user}.key > ${user}.pem
+
+if [ -d /home/${user} ] ; then
+mkdir /home/${user}/.koji
+cp /etc/pki/koji/${user}.pem /home/${user}/.koji/client.crt
+cp /etc/pki/koji/koji_ca_cert.crt /home/${user}/.koji/clientca.crt
+cp /etc/pki/koji/koji_ca_cert.crt /home/${user}/.koji/serverca.crt
+fi
+]]>
+    </file>
+
+    <file name="/etc/pki/koji/kbc.sh" mode="744"><![CDATA[#!/bin/bash
+#!/bin/bash
+cd /etc/pki/koji/
+# generates a koji browser cert for the specified user
+caname=koji
+
+# user is equal to parameter one or the first argument when you actually run the script
+user=$1
+
+openssl pkcs12 -export -inkey certs/${user}.key -in certs/${user}.crt -CAfile ${caname}_ca_cert.crt -out certs/${user}_browser_cert.p12
+]]>
+    </file>
+
+    <file name="/var/lib/pgsql/data/pg_hba.conf" append="true" owner="postgres" group="postgres"><![CDATA[
+host    koji        koji        127.0.0.1/32          trust
+host    koji        koji          ::1/128             trust
+]]>
+    </file>
+
+    <file name="/etc/koji-hub/hub.conf" ><![CDATA[
+[hub]
+DBName = koji
+DBUser = koji
+KojiDir = /mnt/koji
+DNUsernameComponent = CN
+ProxyDNs = /C=US/ST=North Carolina/O=aeolus/OU=kojihub/CN=kojihub/emailAddress=kojiuser@kojihub
+LoginCreatesUser = On
+KojiWebURL = http://kojihub/koji
+NotifyOnSuccess = True
+]]>
+    </file>
+
+    <file name="/etc/kojiweb/web.conf" ><![CDATA[
+[web]
+SiteName = koji
+KojiHubURL = http://kojihub/kojihub
+KojiFilesURL = http://kojihub/kojifiles
+LoginTimeout = 72
+LibPath = /usr/share/koji-web/lib
+]]>
+    </file>
+
+    <file name="/etc/httpd/conf.d/koji.conf"><![CDATA[
+Alias /kojihub /usr/share/koji-hub/kojixmlrpc.py
+<Directory "/usr/share/koji-hub">
+    Options ExecCGI
+    SetHandler wsgi-script
+    Order allow,deny
+    Allow from all
+</Directory>
+
+Alias /kojifiles "/mnt/koji/"
+<Directory "/mnt/koji">
+    Options Indexes
+    AllowOverride None
+    Order allow,deny
+    Allow from all
+</Directory>
+
+Alias /packages/ /mnt/koji/packages/
+<Directory "/mnt/koji/packages">
+    Options Indexes
+    AllowOverride None
+    Order allow,deny
+    Allow from all 
+</Directory>
+]]>
+    </file>
+
+    <file name="/etc/httpd/conf.d/kojiweb.conf"><![CDATA[
+Alias /koji "/usr/share/koji-web/scripts/wsgi_publisher.py"
+<Directory "/usr/share/koji-web/scripts/">
+    Options ExecCGI
+    SetHandler wsgi-script
+    Order allow,deny
+    Allow from all
+</Directory>
+
+Alias /koji-static/ "/usr/share/koji-web/static/"
+<Directory "/usr/share/koji-web/static/">
+    Options None
+    AllowOverride None
+    Order allow,deny
+    Allow from all
+</Directory>
+
+PythonOption KojiHubURL http://kojihub/kojihub
+PythonOption KojiWebURL http://kojihub/koji
+PythonOption KojiPackagesURL http://kojihub/mnt/koji/packages
+
+PythonOption WebCert /etc/pki/koji/kojiweb.pem
+PythonOption ClientCA /etc/pki/koji/koji_ca_cert.crt
+PythonOption KojiHubCA /etc/pki/koji/koji_ca_cert.crt
+
+PythonOption LoginTimeout 72
+PythonOption Secret kojipass
+
+<Location /koji/login>
+SSLOptions +StdEnvVars
+</Location>
+]]>
+    </file>
+
+    <file name="/etc/httpd/conf.d/ssl.conf"><![CDATA[
+LoadModule ssl_module modules/mod_ssl.so
+Listen 443
+
+<VirtualHost _default_:443>
+SSLCertificateFile /etc/pki/koji/certs/kojihub.crt
+SSLCertificateKeyFile /etc/pki/koji/certs/kojihub.key
+SSLCertificateChainFile /etc/pki/koji/koji_ca_cert.crt
+SSLCACertificateFile /etc/pki/koji/koji_ca_cert.crt
+SSLVerifyClient require
+SSLVerifyDepth  10
+
+ErrorLog logs/ssl_error_log
+TransferLog logs/ssl_access_log
+LogLevel warn
+SSLEngine on
+</VirtualHost>
+]]>
+    </file>
+
+    <file name="/etc/koji.conf"><![CDATA[
+[koji]
+
+;configuration for koji cli tool
+
+[koji]
+
+;url of XMLRPC server
+server = http://kojihub/kojihub
+
+;url of web interface
+weburl = http://kojihub/koji
+
+;url of package download site
+pkgurl = http://kojihub/packages
+
+;path to the koji top directory
+topdir = /mnt/koji
+
+;configuration for SSL athentication
+;client certificate
+cert = ~/.koji/client.crt
+
+;certificate of the CA that issued the client certificate
+ca = ~/.koji/clientca.crt
+
+;certificate of the CA that issued the HTTP server certificate
+serverca = ~/.koji/serverca.crt
+]]>
+    </file>
+
+    <file name="/root/koji.sql"><![CDATA[
+insert into users (name, status, usertype) values ('kojiadmin', 0, 0);
+insert into user_perms (user_id, perm_id, creator_id) values (1, 1, 1);
 ]]>
     </file>
   </files>
 
   <commands>
-    <command name="yum-update">yum update -y</command>
-    <command name="start-koji">sh /root/start-koji</command>
+    <command name="disable-selinux">setenforce 0</command>
+    <command name="reload-postgres" user="postgres">pg_ctl -D /var/lib/pgsql/data reload</command>
+    <command name="gen-ca-cert">/etc/pki/koji/kca.sh</command>
+    <command name="gen-hub-cert">/etc/pki/koji/kjc.sh kojihub</command>
+    <command name="gen-hub-cert">/etc/pki/koji/kjc.sh kojiweb</command>
+    <command name="gen-hub-cert">/etc/pki/koji/kjc.sh kojiadmin</command>
+    <!--<command name="gen-hub-cert">/etc/pki/koji/kbc.sh kojiadmin</command>-->
+    <command name="create-koji-dbuser" user="postgres">createuser koji -S -D -R</command>
+    <command name="drop-koji-db" user="postgres">dropdb koji</command>
+    <command name="create-koji-db" user="postgres">createdb -O koji koji</command>
+    <command name="seed-koji-db">psql koji koji -f /usr/share/doc/koji*/docs/schema.sql</command>
+    <command name="seed-koji-db">psql koji koji -f /root/koji.sql</command>
+    <command name="reload-httpd">service httpd reload</command>
   </commands>
 
 </template>

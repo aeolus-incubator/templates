@@ -1,0 +1,53 @@
+<!-- http://fedoraproject.org/wiki/Koji/ServerHowTo -->
+<template>
+  <name>Koji Builder</name>
+  <description>Koji Builder</description>
+  <cloud>
+    <type></type>
+    <provider></provider>
+    <username></username>
+    <password></password>
+    <image></image>
+    <keyname></keyname>
+    <ssh_cmd></ssh_cmd>
+    <scp_cmd></scp_cmd>
+  </cloud>
+
+  <firewall>
+    <tcp>22</tcp>
+    <tcp>80</tcp>
+    <tcp>443</tcp>
+  </firewall>
+
+  <packages>
+    <package name="koji-builder" />
+  </packages>
+
+  <services>
+    <service name="sshd" />
+  </services>
+
+  <files>
+    <file name="/etc/kojid/kojid.pem"><![CDATA[
+BUILDER SSL CREDENTIALS HERE
+]]>
+    </file>
+    <file name="/etc/kojid/koji_ca_cert.crt"><![CDATA[
+KOJIHUB CA CERT HERE
+]]>
+    </file>
+    <file name="/etc/kojid/kojid.conf"><![CDATA[
+[kojid]
+server=http://kojihub/kojihub
+topurl=http://kojihub/kojifiles
+allowed_scms=scm.example.com:/cvs/example git.example.org:/example svn.example.org:/users/*:no
+smtphost=kojihub
+from_addr=Koji Build System <buildsys@example.com>
+cert = /etc/kojid/kojid.pem
+ca = /etc/kojid/koji_ca_cert.crt
+serverca = /etc/kojid/koji_ca_cert.crt
+]]>
+      <after>service kojid restart</after>
+    </file>
+  </files>
+</template>
